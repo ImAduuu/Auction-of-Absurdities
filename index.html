@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en" class="dark h-full bg-slate-950">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auction of Absurdities - Multiplayer Bidding Game</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        gold: {
+                            400: '#fbbf24',
+                            500: '#f59e0b',
+                            600: '#d97706',
+                        },
+                        neon: {
+                            purple: '#a855f7',
+                            pink: '#ec4899',
+                            cyan: '#06b6d4',
+                            emerald: '#10b981'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    animation: {
+                        'pulse-fast': 'pulse 0.8s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'bounce-short': 'bounce 0.5s ease-in-out 2',
+                        'glow': 'glow 2s ease-in-out infinite alternate',
+                    },
+                    keyframes: {
+                        glow: {
+                            '0%': { boxShadow: '0 0 5px rgba(168, 85, 247, 0.4), 0 0 20px rgba(168, 85, 247, 0.2)' },
+                            '100%': { boxShadow: '0 0 20px rgba(168, 85, 247, 0.8), 0 0 35px rgba(236, 72, 153, 0.6)' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- External Font & Icon Dependencies -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Custom CSS File -->
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- Canvas Confetti CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col justify-between selection:bg-neon-purple selection:text-white overflow-x-hidden">
+
+    <!-- TOP HEADER / NAVBAR -->
+    <header class="w-full glass-panel sticky top-0 z-40 px-4 py-3 border-b border-slate-800 shadow-xl">
+        <div class="max-w-6xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3 cursor-pointer" onclick="game.confirmExit()">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-purple-600 flex items-center justify-center text-xl font-extrabold shadow-lg shadow-amber-500/20">
+                    ⚖️
+                </div>
+                <div>
+                    <h1 class="text-lg sm:text-xl font-black tracking-wider bg-gradient-to-r from-amber-400 via-pink-400 to-purple-400 bg-clip-text text-transparent">
+                        AUCTION OF ABSURDITIES
+                    </h1>
+                    <p class="text-xs text-slate-400 font-medium hidden sm:block">Where Fake Items Fetch Real Fortunes</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 sm:gap-3">
+                <!-- Audio Toggle -->
+                <button id="btn-audio-toggle" onclick="game.toggleAudio()" class="px-3 py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white transition flex items-center gap-2 border border-slate-700/80 text-xs font-bold">
+                    <i id="audio-icon" class="fas fa-volume-up text-amber-400"></i>
+                    <span id="audio-label" class="hidden sm:inline">Sound ON</span>
+                </button>
+
+                <!-- Current Room Display -->
+                <div id="header-room-info" class="hidden items-center gap-2 bg-purple-950/60 border border-purple-800/50 px-3 py-1.5 rounded-xl text-xs font-bold">
+                    <span class="text-purple-300 uppercase hidden sm:inline">ROOM:</span>
+                    <span id="header-room-code" class="text-amber-400 font-mono text-sm tracking-wider">----</span>
+                </div>
+
+                <!-- Global Exit Button in Header -->
+                <button id="header-exit-btn" onclick="game.confirmExit()" title="Exit to Main Menu" class="px-3 py-2 bg-red-950/60 hover:bg-red-900 border border-red-800/80 text-red-300 rounded-xl text-xs font-extrabold transition flex items-center gap-1.5 active:scale-95">
+                    <i class="fas fa-door-open text-sm"></i>
+                    <span class="hidden sm:inline">EXIT</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTAINER -->
+    <main class="flex-grow max-w-5xl w-full mx-auto p-4 sm:p-6 flex flex-col justify-center items-center">
+
+        <!-- Toast Notifications Container -->
+        <div id="toast-container" class="fixed top-16 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none"></div>
+
+        <!-- 1. ENTRY / LOBBY SCREEN -->
+        <section id="screen-lobby" class="w-full max-w-md glass-panel p-6 sm:p-8 rounded-3xl shadow-2xl border border-slate-800 text-center animate-fade-in my-auto">
+            <div class="mb-6">
+                <span class="text-5xl inline-block mb-2 animate-bounce-short">🎩</span>
+                <h2 class="text-3xl font-extrabold text-white tracking-tight">Step Right Up!</h2>
+                <p class="text-xs sm:text-sm text-slate-400 mt-1">Bid on ridiculous artifacts or scam your rivals as the Fraudster.</p>
+            </div>
+
+            <div class="space-y-4 text-left">
+                <div>
+                    <label class="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">Your High-Society Name</label>
+                    <div class="relative">
+                        <i class="fas fa-user text-slate-500 absolute left-3.5 top-3.5"></i>
+                        <input type="text" id="input-player-name" maxlength="15" placeholder="Baron Von Bidderson" 
+                            class="w-full pl-10 pr-4 py-3 bg-slate-900/90 border border-slate-700 rounded-xl text-white font-semibold focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 transition text-sm">
+                    </div>
+                </div>
+
+                <div class="pt-2 flex flex-col gap-3">
+                    <button onclick="game.createRoom()" class="w-full py-3.5 px-4 bg-gradient-to-r from-amber-500 via-amber-600 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-slate-950 font-black rounded-xl shadow-lg shadow-amber-500/25 active:scale-95 transition flex items-center justify-center gap-2 text-sm uppercase tracking-wider">
+                        <i class="fas fa-plus-circle text-base"></i>
+                        CREATE NEW AUCTION
+                    </button>
+
+                    <div class="relative flex py-2 items-center">
+                        <div class="flex-grow border-t border-slate-800"></div>
+                        <span class="flex-shrink mx-4 text-slate-500 text-xs uppercase font-bold">or join room</span>
+                        <div class="flex-grow border-t border-slate-800"></div>
+                    </div>
+
+                    <div class="flex gap-2">
+                        <input type="text" id="input-room-code" maxlength="4" placeholder="CODE" 
+                            class="w-1/3 px-3 py-3 bg-slate-900/90 border border-slate-700 rounded-xl text-white text-center font-mono font-bold tracking-widest text-lg uppercase focus:outline-none focus:border-purple-500 transition">
+                        <button onclick="game.joinRoom()" class="w-2/3 py-3 px-4 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-purple-300 font-bold rounded-xl active:scale-95 transition flex items-center justify-center gap-2 text-sm">
+                            <i class="fas fa-door-open"></i>
+                            JOIN ROOM
+                        </button>
+                    </div>
+                </div>
+
+                <div class="pt-4 border-t border-slate-800/80">
+                    <label class="flex items-center gap-3 cursor-pointer select-none">
+                        <input type="checkbox" id="checkbox-fill-bots" checked class="w-4 h-4 rounded text-amber-500 focus:ring-amber-500 bg-slate-900 border-slate-700">
+                        <span class="text-xs text-slate-400 font-medium">Auto-fill missing slots with AI Bidders (Solo Friendly)</span>
+                    </label>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. WAITING ROOM SCREEN -->
+        <section id="screen-waiting" class="hidden w-full max-w-xl glass-panel p-6 sm:p-8 rounded-3xl shadow-2xl border border-slate-800 animate-fade-in my-auto">
+            <div class="text-center mb-6">
+                <span class="inline-block px-3 py-1 bg-purple-900/50 border border-purple-700/50 rounded-full text-[10px] font-bold text-purple-300 uppercase tracking-widest mb-2">Auction House Lobby</span>
+                <h2 class="text-2xl sm:text-3xl font-black text-white">Assemble the Bidders</h2>
+                
+                <div class="mt-4 p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex items-center justify-between gap-4">
+                    <div class="text-left">
+                        <div class="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Room Code</div>
+                        <div id="waiting-room-code" class="text-3xl font-mono font-black text-amber-400 tracking-wider">----</div>
+                    </div>
+                    <button onclick="game.copyRoomCode()" class="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white rounded-xl text-xs font-bold border border-slate-700 transition flex items-center gap-2">
+                        <i class="fas fa-copy"></i>
+                        <span>Copy Code</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="mb-6">
+                <div class="flex justify-between items-center mb-3">
+                    <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Connected Collectors (<span id="waiting-player-count">0</span>/6)</span>
+                    <span class="text-[10px] text-slate-500">Min 2 needed</span>
+                </div>
+                <div id="waiting-players-list" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-56 overflow-y-auto p-1">
+                    <!-- Dynamic Player Cards -->
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                <button id="btn-start-game" onclick="game.startGame()" class="w-full py-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black rounded-xl shadow-lg shadow-emerald-500/20 active:scale-95 transition text-sm tracking-wide flex items-center justify-center gap-2 uppercase">
+                    <i class="fas fa-gavel text-base"></i>
+                    START AUCTION SESSION
+                </button>
+
+                <button onclick="game.confirmExit()" class="w-full py-3 bg-red-950/40 hover:bg-red-900/60 border border-red-800/50 text-red-300 font-bold rounded-xl active:scale-95 transition text-xs tracking-wider flex items-center justify-center gap-2">
+                    <i class="fas fa-sign-out-alt"></i>
+                    LEAVE ROOM & EXIT
+                </button>
+
+                <div id="waiting-guest-msg" class="hidden text-center text-xs text-amber-400/80 font-medium py-1 animate-pulse">
+                    Waiting for the Room Host to start the game...
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. SECRET ROLE MODAL OVERLAY -->
+        <div id="modal-role-reveal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 animate-fade-in">
+            <div class="max-w-md w-full glass-panel p-6 sm:p-8 rounded-3xl border border-slate-700 text-center shadow-2xl relative overflow-hidden">
+                <div id="role-accent-bg" class="absolute -top-24 -left-24 w-48 h-48 rounded-full blur-3xl opacity-30 bg-purple-500"></div>
+                
+                <span id="role-badge-icon" class="text-6xl inline-block mb-3">🕵️️‍♂️</span>
+                <span id="role-badge-title" class="block text-xs font-black uppercase tracking-widest text-purple-400 mb-1">Your Secret Identity</span>
+                <h2 id="role-name" class="text-3xl font-black text-white mb-3">THE FRAUDSTER</h2>
+                
+                <div id="role-desc-card" class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 text-left text-xs sm:text-sm text-slate-300 mb-6 space-y-2">
+                    <!-- Dynamic Role Guidance -->
+                </div>
+
+                <div class="flex flex-col gap-2">
+                    <button onclick="game.dismissRoleModal()" class="w-full py-3.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl shadow-lg active:scale-95 transition text-sm">
+                        Understood. Let's Bid!
+                    </button>
+                    <button onclick="game.confirmExit()" class="w-full py-2 bg-slate-900 hover:bg-red-950/50 border border-slate-800 text-slate-400 hover:text-red-300 font-bold rounded-xl active:scale-95 transition text-xs">
+                        <i class="fas fa-sign-out-alt mr-1"></i> Exit Game
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. MAIN BIDDING ARENA -->
+        <section id="screen-arena" class="hidden w-full max-w-4xl flex flex-col gap-4 animate-fade-in">
+            
+            <div class="glass-panel p-3 sm:p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3 border border-slate-800">
+                <div class="flex items-center gap-2 sm:gap-3">
+                    <span class="px-3 py-1 bg-amber-500/10 border border-amber-500/30 text-amber-400 rounded-lg text-xs font-bold uppercase tracking-wider">
+                        Item <span id="arena-item-index">1</span>/5
+                    </span>
+                    <div id="user-role-indicator" class="text-xs font-bold px-3 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-300">
+                        <!-- Collector or Fraudster badge -->
+                    </div>
+                </div>
+
+                <!-- Timer Display -->
+                <div class="flex items-center gap-3">
+                    <div class="text-right">
+                        <span class="text-[9px] uppercase font-extrabold text-slate-400 block tracking-widest">Time Remaining</span>
+                        <span id="arena-timer" class="text-xl sm:text-2xl font-mono font-black text-amber-400">15s</span>
+                    </div>
+                    <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center">
+                        <i id="arena-timer-icon" class="fas fa-hourglass-half text-amber-400 text-base"></i>
+                    </div>
+                </div>
+
+                <!-- User Balance & Exit -->
+                <div class="flex items-center gap-3">
+                    <div class="text-right">
+                        <span class="text-[9px] uppercase font-extrabold text-slate-400 block tracking-widest">Your Purse</span>
+                        <span id="arena-user-balance" class="text-base sm:text-lg font-mono font-black text-emerald-400">$10,000</span>
+                    </div>
+                    
+                    <button onclick="game.confirmExit()" title="Exit Game" class="px-3 py-2 bg-red-950/60 hover:bg-red-900 border border-red-800 text-red-300 rounded-xl text-xs font-extrabold transition flex items-center gap-1.5 active:scale-95">
+                        <i class="fas fa-door-open text-sm"></i>
+                        <span class="hidden sm:inline">EXIT</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Item Showcase & Bidding Layout -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                
+                <div class="lg:col-span-7 glass-panel p-5 sm:p-6 rounded-3xl border border-slate-800 flex flex-col justify-between relative overflow-hidden">
+                    <div>
+                        <div class="flex justify-between items-start gap-2 mb-3">
+                            <span id="item-category" class="px-2.5 py-0.5 bg-slate-800 text-slate-400 border border-slate-700 rounded-md text-[10px] font-extrabold uppercase tracking-widest">
+                                Oddity
+                            </span>
+                            <span id="item-appraisal" class="text-xs font-mono text-slate-400">
+                                Appraised: <strong class="text-amber-300 font-bold">$4,500</strong>
+                            </span>
+                        </div>
+
+                        <div class="text-center py-4 my-2 bg-slate-900/60 rounded-2xl border border-slate-800/80">
+                            <span id="item-emoji" class="text-6xl inline-block drop-shadow-lg transform hover:scale-110 transition duration-300">🏺</span>
+                            <h3 id="item-title" class="text-2xl font-black text-white mt-3 px-2">Jar of Certified Haunted Air</h3>
+                        </div>
+
+                        <p id="item-description" class="text-xs sm:text-sm text-slate-300 leading-relaxed italic text-center px-2">
+                            "Sealed in 1842 by a frightened Victorian chimney sweep. Ghostly whispers not guaranteed, but highly likely."
+                        </p>
+                    </div>
+
+                    <div id="intel-secret-box" class="mt-4 p-3 rounded-xl bg-purple-950/40 border border-purple-800/40 text-xs text-purple-300 flex items-center gap-2">
+                        <i class="fas fa-user-secret text-purple-400 text-base flex-shrink-0"></i>
+                        <span id="intel-secret-text">Secret Intel: Fake item! Pump the price to bankrupt rival collectors!</span>
+                    </div>
+                </div>
+
+                <div class="lg:col-span-5 glass-panel p-5 sm:p-6 rounded-3xl border border-slate-800 flex flex-col justify-between">
+                    <div>
+                        <span class="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">Current Highest Bid</span>
+                        <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 text-center mb-4 relative">
+                            <div id="arena-high-bid" class="text-3xl sm:text-4xl font-mono font-black text-amber-400 text-glow">
+                                $500
+                            </div>
+                            <div class="text-xs text-slate-400 font-medium mt-1">
+                                Held by: <span id="arena-high-bidder" class="text-slate-200 font-bold">Starting Price</span>
+                            </div>
+                        </div>
+
+                        <span class="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-2">Bidding Ticker Log</span>
+                        <div id="arena-bid-log" class="h-32 overflow-y-auto space-y-1.5 p-2 rounded-xl bg-slate-950/60 border border-slate-900 text-xs">
+                        </div>
+                    </div>
+
+                    <div class="mt-4 pt-3 border-t border-slate-800/80 space-y-2">
+                        <div class="grid grid-cols-3 gap-2">
+                            <button onclick="game.placeBid(100)" class="py-3 bg-slate-800 hover:bg-slate-700 text-amber-400 font-mono font-bold rounded-xl border border-amber-500/30 active:scale-95 transition text-xs sm:text-sm">
+                                +$100
+                            </button>
+                            <button onclick="game.placeBid(500)" class="py-3 bg-slate-800 hover:bg-slate-700 text-amber-400 font-mono font-bold rounded-xl border border-amber-500/30 active:scale-95 transition text-xs sm:text-sm">
+                                +$500
+                            </button>
+                            <button onclick="game.placeBid(1000)" class="py-3 bg-slate-800 hover:bg-slate-700 text-amber-400 font-mono font-bold rounded-xl border border-amber-500/30 active:scale-95 transition text-xs sm:text-sm">
+                                +$1,000
+                            </button>
+                        </div>
+                        <button onclick="game.placeAllInBid()" class="w-full py-3 bg-gradient-to-r from-red-600 via-pink-600 to-purple-600 hover:from-red-500 hover:to-purple-500 text-white font-black rounded-xl shadow-lg shadow-pink-600/20 active:scale-95 transition text-xs uppercase tracking-wider flex items-center justify-center gap-2">
+                            <i class="fas fa-fire"></i>
+                            ALL IN! (Max Purse)
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. AUCTION REVEAL MODAL (WITH EXPLICIT EXIT OPTION) -->
+        <div id="modal-item-result" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 animate-fade-in">
+            <div class="max-w-md w-full glass-panel p-6 sm:p-8 rounded-3xl border border-slate-700 text-center shadow-2xl relative">
+                
+                <!-- Close/Exit button top-right of popup -->
+                <button onclick="game.confirmExit()" title="Exit Game" class="absolute top-4 right-4 text-slate-400 hover:text-red-400 transition text-lg w-8 h-8 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center">
+                    <i class="fas fa-times"></i>
+                </button>
+
+                <div class="mb-4">
+                    <span id="result-gavel-icon" class="text-5xl inline-block mb-2 animate-bounce">🔨</span>
+                    <h2 class="text-[10px] font-black uppercase tracking-widest text-slate-400">Gavel Knocked! Item Sold!</h2>
+                    <h3 id="result-item-name" class="text-xl font-extrabold text-white">NFT of a Half-Eaten Sandwich</h3>
+                </div>
+
+                <div id="result-status-card" class="p-5 rounded-2xl mb-4 border transition duration-500">
+                    <span id="result-authenticity-badge" class="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-red-500/20 text-red-400 border border-red-500/40 inline-block mb-2">
+                        COUNTERFEIT / FAKE!
+                    </span>
+                    <div id="result-price-paid" class="text-3xl font-mono font-black text-white">
+                        Sold for $2,700
+                    </div>
+                    <div id="result-winner-name" class="text-sm font-semibold text-slate-300 mt-1">
+                        Won by: Lord Pennyworth
+                    </div>
+                </div>
+
+                <div id="result-financial-impact" class="text-xs text-slate-300 bg-slate-900/80 p-3 rounded-xl border border-slate-800 text-left space-y-1 mb-6">
+                </div>
+
+                <div class="flex flex-col gap-2">
+                    <button onclick="game.nextRound()" class="w-full py-3.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-black rounded-xl shadow-lg active:scale-95 transition text-sm">
+                        Continue to Next Item
+                    </button>
+                    
+                    <button onclick="game.confirmExit()" class="w-full py-2.5 bg-slate-900 hover:bg-red-950/60 border border-slate-800 hover:border-red-800 text-slate-400 hover:text-red-300 font-bold rounded-xl active:scale-95 transition text-xs flex items-center justify-center gap-2">
+                        <i class="fas fa-sign-out-alt"></i>
+                        Exit Game Session
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 6. LEADERBOARD / GAME OVER SCREEN -->
+        <section id="screen-gameover" class="hidden w-full max-w-2xl glass-panel p-6 sm:p-8 rounded-3xl border border-slate-800 text-center animate-fade-in my-auto">
+            <div class="mb-6">
+                <span class="text-6xl inline-block mb-2">🏆</span>
+                <h2 class="text-3xl font-black text-white tracking-tight">AUCTION SESSION CONCLUDED</h2>
+                <p class="text-xs text-slate-400 mt-1">Final Net Worth, Genuine Collectibles & Heist Totals</p>
+            </div>
+
+            <div id="gameover-fraudster-card" class="p-4 rounded-2xl bg-purple-950/40 border border-purple-800/50 mb-6 text-left flex items-center gap-4">
+                <div class="w-12 h-12 rounded-xl bg-purple-900/80 border border-purple-700 flex items-center justify-center text-2xl flex-shrink-0">
+                    🕵️
+                </div>
+                <div>
+                    <span class="text-[10px] font-black uppercase tracking-widest text-purple-400 block">The Secret Fraudster Unveiled</span>
+                    <div id="gameover-fraudster-name" class="text-base font-bold text-white">Player Name</div>
+                    <div id="gameover-fraudster-stats" class="text-xs text-purple-300 mt-0.5">Scammed $0 out of auction bidders</div>
+                </div>
+            </div>
+
+            <div class="mb-6 overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/60">
+                <table class="w-full text-left text-xs">
+                    <thead class="bg-slate-950/80 text-slate-400 uppercase font-black text-[10px] tracking-wider border-b border-slate-800">
+                        <tr>
+                            <th class="p-3">Rank</th>
+                            <th class="p-3">Collector</th>
+                            <th class="p-3 text-right">Cash Left</th>
+                            <th class="p-3 text-right">Valuation</th>
+                            <th class="p-3 text-right">Net Worth</th>
+                        </tr>
+                    </thead>
+                    <tbody id="gameover-leaderboard-rows" class="divide-y divide-slate-800/60 font-medium">
+                    </tbody>
+                </table>
+            </div>
+
+            <button onclick="game.exitToMainMenu()" class="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black rounded-xl shadow-lg active:scale-95 transition text-sm">
+                <i class="fas fa-redo-alt mr-2"></i> MAIN MENU / NEW SESSION
+            </button>
+        </section>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="w-full py-4 text-center text-xs text-slate-500 border-t border-slate-900 bg-slate-950/80">
+        <p>Auction of Absurdities &copy; Multi-Tab Web Party Game. Built with HTML5, Tailwind & Web Audio.</p>
+    </footer>
+
+    <!-- Custom JavaScript File -->
+    <script src="script.js"></script>
+</body>
+</html>
